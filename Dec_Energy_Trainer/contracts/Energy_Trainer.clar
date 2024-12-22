@@ -138,7 +138,8 @@
     (print {event: "producer-rated", producer: producer, rating: rating})
     (ok true)))
 
-    (define-public (request-refund (producer principal) (energy-amount uint))
+
+(define-public (request-refund (producer principal) (energy-amount uint))
   (let (
     (consumer-data (unwrap! (get-consumer-info tx-sender) (err err-no-purchase-history)))
     (producer-data (unwrap! (get-producer-info producer) (err err-producer-not-found)))
@@ -190,3 +191,20 @@
       { energy-available: u0, energy-price: u0 })
     (print {event: "producer-paused", producer: producer})
     (ok true)))
+
+;; Admin functions
+(define-public (set-energy-price (producer principal) (new-price uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) (err err-not-owner))
+    (asserts! (> new-price u0) (err err-invalid-amount))
+    (match (map-get? producers producer)
+      producer-data (begin
+        (map-set producers producer 
+          { energy-available: (get energy-available producer-data), energy-price: new-price })
+        (print {event: "price-updated", producer: producer, new-price: new-price})
+        (ok true))
+      (err err-producer-not-found))))
+
+;; Utility functions
+(define-private (min-of (a uint) (b uint))
+  (if (<= a b) a b))
