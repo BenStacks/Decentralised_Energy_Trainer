@@ -118,3 +118,22 @@
     (print {event: "energy-updated", producer: tx-sender, new-total: (+ current-energy new-energy)})
     (ok true)))
 
+(define-public (rate-producer (producer principal) (rating uint))
+  (let (
+    (current-ratings (default-to (list) (map-get? producer-ratings producer)))
+    (current-reputation (default-to u0 (map-get? producer-reputation producer)))
+  )
+    (asserts! (and (>= rating u1) (<= rating u5)) (err err-invalid-rating))
+    (asserts! (> (default-to u0 (map-get? energy-purchased tx-sender)) u0) 
+              (err err-no-purchase-history))
+    
+    ;; Update ratings list (keep last 10)
+    (map-set producer-ratings producer 
+      (unwrap-panic (as-max-len? (concat (list rating) current-ratings) u10)))
+    
+    ;; Update reputation (simple average)
+    (map-set producer-reputation producer 
+      (/ (+ current-reputation rating) u2))
+    
+    (print {event: "producer-rated", producer: producer, rating: rating})
+    (ok true)))
