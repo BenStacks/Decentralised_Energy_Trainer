@@ -137,3 +137,56 @@
     
     (print {event: "producer-rated", producer: producer, rating: rating})
     (ok true)))
+
+    (define-public (request-refund (producer principal) (energy-amount uint))
+  (let (
+    (consumer-data (unwrap! (get-consumer-info tx-sender) (err err-no-purchase-history)))
+    (producer-data (unwrap! (get-producer-info producer) (err err-producer-not-found)))
+    (energy-price (get energy-price producer-data))
+    (refund-amount (* energy-amount energy-price))
+  )
+    (asserts! (<= energy-amount (get energy-consumed consumer-data)) 
+              (err err-refund-exceeds-purchase))
+    
+    ;; Process refund
+    (match (stx-transfer? refund-amount producer tx-sender)
+      success
+        (begin
+          ;; Update consumer records
+          (map-set consumers tx-sender 
+            { 
+              energy-consumed: (- (get energy-consumed consumer-data) energy-amount),
+              total-spent: (- (get total-spent consumer-data) refund-amount)
+            })
+          
+          ;; Update refund tracking
+          (map-set energy-refunds tx-sender 
+            (+ (default-to u0 (map-get? energy-refunds tx-sender)) energy-amount))
+          
+          ;; Update producer revenue
+          (map-set producer-revenue producer 
+            (- (default-to u0 (map-get? producer-revenue producer)) refund-amount))
+          
+          (print {event: "refund-processed", producer: producer, consumer: tx-sender, 
+                 amount: energy-amount, refund: refund-amount})
+          (ok true)
+        )
+      error (err err-stx-transfer-failed)
+    )))
+
+(define-public (withdraw-revenue)
+  (let (
+    (revenue (default-to u0 (map-get? producer-revenue tx-sender)))
+  )
+    (asserts! (> revenue u0) (err err-insufficient-funds))
+    (map-set producer-revenue tx-sender u0)
+    (print {event: "revenue-withdrawn", producer: tx-sender, amount: revenue})
+    (ok revenue)))
+
+(define-public (pause-producer (producer principal))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) (err err-not-owner))
+    (map-set producers producer 
+      { energy-available: u0, energy-price: u0 })
+    (print {event: "producer-paused", producer: producer})
+    (ok true)))
