@@ -202,5 +202,46 @@ Clarinet.test({
     },
 });
 
+// Admin Function Tests
+Clarinet.test({
+    name: "Ensure that admin functions are protected",
+    async fn(chain: Chain, accounts: Map<string, Account>)
+    {
+        const deployer = accounts.get("deployer")!;
+        const producer = accounts.get("wallet_1")!;
+        const unauthorized = accounts.get("wallet_2")!;
+
+        // Setup producer
+        let block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "register-producer",
+                [types.uint(1000), types.uint(10)],
+                producer.address
+            )
+        ]);
+
+        // Set price as contract owner
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "set-energy-price",
+                [types.principal(producer.address),
+                types.uint(15)],
+                deployer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(ok true)');
+
+        // Try setting price as unauthorized user
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "set-energy-price",
+                [types.principal(producer.address),
+                types.uint(15)],
+                unauthorized.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(err u100)'); // err-not-owner
+    },
+});
+
 
 
