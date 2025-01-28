@@ -150,8 +150,57 @@ Clarinet.test({
             )
         ]);
 
-        assertEquals(block.receipts[0].result, '(err u107)'); // err-no-purchase-history
+        assertEquals(block.receipts[0].result, '(err u107)');
     },
 });
+
+// Refund Tests
+Clarinet.test({
+    name: "Ensure that refund system works correctly",
+    async fn(chain: Chain, accounts: Map<string, Account>)
+    {
+        const producer = accounts.get("wallet_1")!;
+        const consumer = accounts.get("wallet_2")!;
+
+        // Setup: Register, make purchase
+        let block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "register-producer",
+                [types.uint(1000), types.uint(10)],
+                producer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "register-consumer",
+                [],
+                consumer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "buy-energy",
+                [types.principal(producer.address), types.uint(100)],
+                consumer.address
+            )
+        ]);
+
+        // Request refund
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "request-refund",
+                [types.principal(producer.address),
+                types.uint(50)], // refund 50 units
+                consumer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(ok true)');
+
+        // Try refunding more than purchased
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "request-refund",
+                [types.principal(producer.address),
+                types.uint(200)],
+                consumer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(err u108)');
+    },
+});
+
 
 
