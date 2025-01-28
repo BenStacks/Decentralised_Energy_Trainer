@@ -243,5 +243,41 @@ Clarinet.test({
     },
 });
 
+// Revenue Withdrawal Tests
+Clarinet.test({
+    name: "Ensure that revenue withdrawal works correctly",
+    async fn(chain: Chain, accounts: Map<string, Account>)
+    {
+        const producer = accounts.get("wallet_1")!;
+        const consumer = accounts.get("wallet_2")!;
+
+        // Setup and make sale
+        let block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "register-producer",
+                [types.uint(1000), types.uint(10)],
+                producer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "register-consumer",
+                [],
+                consumer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "buy-energy",
+                [types.principal(producer.address), types.uint(100)],
+                consumer.address
+            )
+        ]);
+
+        // Withdraw revenue
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "withdraw-revenue",
+                [],
+                producer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(ok u1000)'); // 100 units * 10 price
+    },
+});
+
 
 
