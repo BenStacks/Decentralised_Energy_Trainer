@@ -105,4 +105,53 @@ Clarinet.test({
     },
 });
 
+// Rating System Tests
+Clarinet.test({
+    name: "Ensure that producer rating system works correctly",
+    async fn(chain: Chain, accounts: Map<string, Account>)
+    {
+        const producer = accounts.get("wallet_1")!;
+        const consumer = accounts.get("wallet_2")!;
+
+        // Setup: Register, and make a purchase
+        let block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "register-producer",
+                [types.uint(1000), types.uint(10)],
+                producer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "register-consumer",
+                [],
+                consumer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "buy-energy",
+                [types.principal(producer.address), types.uint(100)],
+                consumer.address
+            )
+        ]);
+
+        // Rate producer
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "rate-producer",
+                [types.principal(producer.address),
+                types.uint(5)], // 5-star rating
+                consumer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(ok true)');
+
+        // Try rating without purchase history
+        const newConsumer = accounts.get("wallet_3")!;
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "rate-producer",
+                [types.principal(producer.address),
+                types.uint(5)],
+                newConsumer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(err u107)'); // err-no-purchase-history
+    },
+});
+
 
