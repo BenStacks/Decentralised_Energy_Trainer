@@ -40,7 +40,7 @@ Clarinet.test({
         const consumer = accounts.get("wallet_2")!;
 
         let block = chain.mineBlock([
-            Tx.contractCall("energy-trading", "register-consumer",
+            Tx.contractCall("Energy_Trainer", "register-consumer",
                 [],
                 consumer.address
             )
@@ -50,7 +50,7 @@ Clarinet.test({
 
         // Verify consumer info
         let result = chain.callReadOnlyFn(
-            "energy-trading",
+            "Energy_Trainer",
             "get-consumer-info",
             [types.principal(consumer.address)],
             consumer.address
@@ -60,4 +60,49 @@ Clarinet.test({
             '(ok {energy-consumed: u0, total-spent: u0})');
     },
 });
+
+// Energy Purchase Tests
+Clarinet.test({
+    name: "Ensure that energy purchase works correctly",
+    async fn(chain: Chain, accounts: Map<string, Account>)
+    {
+        const producer = accounts.get("wallet_1")!;
+        const consumer = accounts.get("wallet_2")!;
+
+        // Setup: Register producer and consumer
+        let block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "register-producer",
+                [types.uint(1000), types.uint(10)],
+                producer.address
+            ),
+            Tx.contractCall("Energy_Trainer", "register-consumer",
+                [],
+                consumer.address
+            )
+        ]);
+
+        // Purchase energy
+        block = chain.mineBlock([
+            Tx.contractCall("Energy_Trainer", "buy-energy",
+                [types.principal(producer.address),
+                types.uint(100)], // buy 100 units
+                consumer.address
+            )
+        ]);
+
+        assertEquals(block.receipts[0].result, '(ok true)');
+
+        // Verify updated balances
+        let producerInfo = chain.callReadOnlyFn(
+            "Energy_Trainer",
+            "get-producer-info",
+            [types.principal(producer.address)],
+            producer.address
+        );
+
+        assertEquals(producerInfo.result,
+            '(ok {energy-available: u900, energy-price: u10})');
+    },
+});
+
 
